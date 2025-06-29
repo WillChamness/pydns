@@ -7,7 +7,7 @@ def parse_args() -> None:
     parser = argparse.ArgumentParser()
 
     parser.add_argument("query", type=str, metavar="NAME", help="the name to query")
-    parser.add_argument("-d", "--dns-server", type=str, required=False, metavar="IPADDR", help="the DNS server to be queried. ignored if `-q, --query` is not specified. default: use the first nameserver in /etc/resolv.conf")
+    parser.add_argument("-d", "--dns-server", type=str, required=False, metavar="IPADDR", help="the DNS server to be queried (default: use the first nameserver in /etc/resolv.conf)")
 
     args = parser.parse_args()
     
