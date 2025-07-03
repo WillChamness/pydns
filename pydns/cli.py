@@ -8,6 +8,7 @@ def parse_args() -> None:
 
     parser.add_argument("query", type=str, metavar="NAME", help="the name to query")
     parser.add_argument("-d", "--dns-server", type=str, required=False, metavar="IPADDR", help="the DNS server to be queried (default: use the first nameserver in /etc/resolv.conf)")
+    parser.add_argument("-v", "--verbose", action="store_true", help="be as verbose as possible")
 
     args = parser.parse_args()
     
@@ -20,7 +21,7 @@ def parse_args() -> None:
         else:
             nameserver = default_nameserver
 
-    client.run(args.query, nameserver)
+    client.run(args.query, nameserver, args.verbose)
 
 
 def _get_default_nameserver() -> str|None:

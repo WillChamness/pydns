@@ -1,9 +1,10 @@
+import re
 import socket
 from pydns.dns_message import header, query, response
 from pydns.dns_message.dns_data import DnsType, DnsClass
 from pydns.helpers import UShort, DnsConstants
 
-def run(name_to_query: str, dns_server: str) -> None:
+def run(name_to_query: str, dns_server: str, verbose: bool) -> None:
     client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     client.settimeout(2)
 
@@ -33,13 +34,20 @@ def run(name_to_query: str, dns_server: str) -> None:
         print(f"No response from {dns_server}")
         return
 
-    print(f"Response from {dns_server}:")
-    print("="*10, "HEADER", "="*10)
-    print(parsed_header)
-    print("="*10, "QUERY", "="*10)
-    print(parsed_query)
-    print("="*10, "ANSWERS", "="*10)
-    for answer in answers:
-        print("\n".join(answer) + "\n")
-    
+    if verbose:
+        print(f"Response from {dns_server}:")
+        print("="*10, "HEADER", "="*10)
+        print(f"Transaction ID: {hex(transaction_id.val)}")
+        print(parsed_header)
+        print("="*10, "QUERY", "="*10)
+        print(parsed_query)
+        print("="*10, "ANSWERS", "="*10)
+        for answer in answers:
+            print("\n".join(answer) + "\n")
+    else:
+        for answer in answers:
+            if answer[1] == "Type: A (1)":
+                address: str = answer[5].split(" ")[1]
+                print(address)
+            
     
