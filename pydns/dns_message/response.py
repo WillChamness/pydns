@@ -1,97 +1,102 @@
 from pydns.dns_message.dns_data import DnsClass, DnsType
 
-def parse_response(data: bytes, start_index: int) -> list[list[str]]:
-    name: str
-    dns_type: DnsType
-    dns_class: DnsClass
-    ttl: int
-    data_length: int
-    answer: bytes
-    next_answer: int
 
-    POINTER_TO_NAME_FLAG = 0xC0
-    if start_index >= len(data) or data[start_index] == 0:
+def parse_response(
+    data: bytes, start_index: int, current_count: int = 0
+) -> list[list[str]]:
+    number_of_answers: int = int.from_bytes(data[6:10], "big", signed=False)
+    if start_index >= len(data) or current_count >= number_of_answers:
         return []
-    elif data[start_index] == POINTER_TO_NAME_FLAG:
-        pointer_to_name: int = data[start_index + 1]
-        name, _ = _get_name(data, pointer_to_name)
-        dns_type = DnsType(
-            int.from_bytes(data[start_index + 2 : start_index + 4], "big", signed=False)
-        )
-        dns_class = DnsClass(
-            int.from_bytes(data[start_index + 4 : start_index + 6], "big", signed=False)
-        )
-        ttl = int.from_bytes(
-            data[start_index + 6 : start_index + 10], "big", signed=False
-        )
-        data_length = int.from_bytes(
-            data[start_index + 10 : start_index + 12], "big", signed=False
-        )
-        answer = data[start_index + 12 : start_index + 12 + data_length]
-        next_answer = start_index + 12 + data_length
-    else:
-        name, pointer_to_dns_type = _get_name(data, start_index)
-        dns_type = DnsType(
-            int.from_bytes(
-                data[pointer_to_dns_type : pointer_to_dns_type + 2], "big", signed=False
-            )
-        )
-        dns_class = DnsClass(
-            int.from_bytes(
-                data[pointer_to_dns_type + 2 : pointer_to_dns_type + 4],
-                "big",
-                signed=False,
-            )
-        )
-        ttl = int.from_bytes(
-            data[pointer_to_dns_type + 4 : pointer_to_dns_type + 8], "big", signed=False
-        )
-        data_length = int.from_bytes(
-            data[pointer_to_dns_type + 8 : pointer_to_dns_type + 10],
-            "big",
-            signed=False,
-        )
-        answer = data[pointer_to_dns_type + 10 : pointer_to_dns_type + 10 + data_length]
-        next_answer = start_index + 10 + data_length
 
-    parsed_answer: str
+    POINTER_TO_NAME_INDICATOR = 0xC0
+    name: str
+    pointer_to_type: int
+    name, pointer_to_type = (
+        _get_name_from_pointer(data, start_index)
+        if data[start_index] == POINTER_TO_NAME_INDICATOR
+        else _parse_name(data, start_index)
+    )
+    dns_type: DnsType = DnsType(
+        int.from_bytes(data[pointer_to_type : pointer_to_type + 2], "big", signed=False)
+    )
+    dns_class: DnsClass = DnsClass(
+        int.from_bytes(
+            data[pointer_to_type + 2 : pointer_to_type + 4], "big", signed=False
+        )
+    )
+    ttl: int = int.from_bytes(
+        data[pointer_to_type + 4 : pointer_to_type + 8], "big", signed=False
+    )
+    data_length: int = int.from_bytes(
+        data[pointer_to_type + 8 : pointer_to_type + 10], "big", signed=False
+    )
+    answer: str
+    pointer_to_next_answer: int
     if dns_type == DnsType.A:
-        assert len(answer) == 4
-        octet1: int = answer[0]
-        octet2: int = answer[1]
-        octet3: int = answer[2]
-        octet4: int = answer[3]
-        parsed_answer = f"{octet1}.{octet2}.{octet3}.{octet4}"
+        answer, pointer_to_next_answer = _get_ipv4(data, pointer_to_type + 10)
     elif dns_type == DnsType.CNAME:
-        parsed_answer, _ = _get_name(answer, 0)
+        if data[pointer_to_type + 10 + (data_length - 1)] == 0:
+            answer, pointer_to_next_answer = _parse_name(data, pointer_to_type + 10)
+        else:
+            answer, pointer_to_next_answer = _get_name_from_pointer(
+                data, pointer_to_type + 10
+            )
     else:
-        parsed_answer = "Unsupported DNS type"
+        answer, pointer_to_next_answer = "Unsupported DNS type", len(data)
 
-    result: list[str] = [
+    result = [
         f"Name: {name}",
         f"Type: {str(dns_type)[len('DnsType.'):]} ({dns_type.value})",
         f"Class: {str(dns_class)[len('DnsClass.'):]} ({dns_class.value})",
         f"Time to live: {ttl} seconds",
         f"Data length: {data_length} bytes",
-        ("Address: " if dns_type == DnsType.A else "CNAME: ") + parsed_answer,
+        ("Address: " if dns_type == DnsType.A else "CNAME: ") + answer,
     ]
 
-    return [result, *parse_response(data, next_answer)]
+    return [result, *parse_response(data, pointer_to_next_answer, current_count + 1)]
 
 
-def _get_name(data: bytes, start_index: int) -> tuple[str, int]:
+def _get_name_from_pointer(data: bytes, start_index: int) -> tuple[str, int]:
+    def go(data: bytes, current_index: int) -> tuple[str, int]:
+        POINTER_TO_NAME_INDICATOR = 0xC0
+        if data[current_index] == 0:
+            return ("", 0)
+        elif data[current_index] == POINTER_TO_NAME_INDICATOR:
+            pointer_to_name: int = data[current_index + 1]
+            name, _ = go(data, pointer_to_name)
+            return (name, 2)
+        else:
+            subdomain_length: int = data[current_index]
+            subdomain: str = data[
+                current_index + 1 : current_index + 1 + subdomain_length
+            ].decode("ascii")
+            name, offset = go(data, current_index + 1 + subdomain_length)
+            return (subdomain + "." + name, 1 + subdomain_length + offset)
+
+    name, offset = go(data, start_index)
+    return (name[: len(name) - 1], start_index + offset)
+
+
+def _get_ipv4(data: bytes, start_index: int) -> tuple[str, int]:
+    octet1: int = data[start_index]
+    octet2: int = data[start_index + 1]
+    octet3: int = data[start_index + 2]
+    octet4: int = data[start_index + 3]
+
+    return (f"{octet1}.{octet2}.{octet3}.{octet4}", start_index + 4)
+
+
+def _parse_name(data: bytes, start_index: int) -> tuple[str, int]:
     stop_index: int = start_index
     while data[stop_index] != 0:
         stop_index += 1
 
-    subdomains: list[str] = []
     index: int = start_index
-
+    subdomains: list[str] = []
     while index < stop_index:
-        subdomain_size: int = data[index]
-        subdomains.append(data[index + 1 : index + 1 + subdomain_size].decode("ascii"))
-        index += 1 + subdomain_size
+        subdomain_length: int = data[index]
+        subdomain: str = data[index + 1 : index + 1 + subdomain_length].decode("ascii")
+        subdomains.append(subdomain)
+        index += 1 + subdomain_length
 
-    name: str = ".".join(subdomains)
-    return (name, stop_index + 1)
-
+    return (".".join(subdomains), stop_index + 1)
