@@ -13,7 +13,7 @@ positional arguments:
 options:
   -h, --help            show this help message and exit
   -d IPADDR, --dns-server IPADDR
-                        the DNS server to be queried (default: use the first nameserver in /etc/resolv.conf)
+                        the DNS server to be queried. required if using Windows (default: use the first nameserver in /etc/resolv.conf)
   -v, --verbose         be as verbose as possible
 ```
 
