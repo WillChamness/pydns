@@ -33,7 +33,7 @@ $ python -m pydns -d 1.1.1.1 image.google.com
 172.253.124.101
 172.253.124.100
 
-$ dig 1.1.1.1 image.google.com
+$ dig @1.1.1.1 image.google.com
 (output omitted)
 
 ;; ANSWER SECTION:
