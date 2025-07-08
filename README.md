@@ -17,6 +17,11 @@ options:
   -v, --verbose         be as verbose as possible
 ```
 
+## Known Limitations
+
+- Only A records and CNAMEs are supported
+- Reverse DNS lookup is not supported
+
 ## Example Output
 
 ```
@@ -46,11 +51,6 @@ images.l.google.com.    300     IN      A       173.194.219.100
 ;; WHEN: Mon Jul 07 22:21:14 EDT 2025
 ;; MSG SIZE  rcvd: 185
 ```
-
-## Known Limitations
-
-- Only A records and CNAMEs are supported
-- Reverse DNS lookup is not supported
 
 ## Example Verbose Output
 
