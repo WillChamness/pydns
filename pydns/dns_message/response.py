@@ -41,6 +41,8 @@ def parse_response(
             answer, pointer_to_next_answer = _get_name_from_pointer(
                 data, pointer_to_type + 10
             )
+    elif dns_type == DnsType.SOA:
+        answer, pointer_to_next_answer = _get_name_from_pointer(data, pointer_to_type + 10)
     else:
         answer, pointer_to_next_answer = "Unsupported DNS type", len(data)
 
@@ -50,8 +52,13 @@ def parse_response(
         f"Class: {str(dns_class)[len('DnsClass.'):]} ({dns_class.value})",
         f"Time to live: {ttl} seconds",
         f"Data length: {data_length} bytes",
-        ("Address: " if dns_type == DnsType.A else "CNAME: ") + answer,
     ]
+    if dns_type == DnsType.A:
+        result.append("Address: " + answer)
+    elif dns_type == DnsType.CNAME:
+        result.append("CNAME: " + answer)
+    else:
+        result.append("Response: " + answer)
 
     return [result, *parse_response(data, pointer_to_next_answer, current_count + 1)]
 
